@@ -8,71 +8,97 @@
 ```
 
 [![AWS](https://img.shields.io/badge/AWS-IAM-orange?style=flat&logo=amazonaws)](https://github.com/Yeshi30/cloud-security-portfolio)
-[![CloudTrail](https://img.shields.io/badge/CloudTrail-Logging-blue?style=flat&logo=amazon)](https://github.com/Yeshi30/cloud-security-portfolio)
+[![EC2](https://img.shields.io/badge/Amazon-EC2-blue?style=flat&logo=amazon)](https://github.com/Yeshi30/cloud-security-portfolio)
 [![Level](https://img.shields.io/badge/Level-Beginner-green?style=flat)](https://github.com/Yeshi30/cloud-security-portfolio)
 
-> Least-privilege IAM structure with user groups, role assignments, MFA enforcement, and full API activity logging via CloudTrail.
+> Built a least-privilege IAM policy to protect a production EC2 instance 
+> from an intern user — tested and verified using the IAM Policy Simulator.
 
-## What It Does
+## Problem
 
-- Create IAM user groups with least-privilege policies
-- Assign users to groups based on their role
-- Enforce MFA for all users
-- Enable CloudTrail to log all API activity
-- Test and verify permissions for each group
+A new intern needs access to a development EC2 instance but must be completely 
+blocked from the production environment. Without proper IAM controls, a single 
+mistake could take down a production server and cause serious business disruption.
+
+## Solution
+
+Create a tag-based IAM policy that restricts the intern to only the development 
+instance using resource tags. Attach the policy to a user group so permissions 
+are managed at the group level. Verify everything works using real login testing 
+and the IAM Policy Simulator before granting access.
+
+## Architecture
+```
+IAM User (intern)
+    └── nextwork-dev-group
+            └── nextwork-dev-policy
+                    ├── ALLOW ec2:* on Env=development instances
+                    ├── ALLOW ec2:Describe* on all instances
+                    └── DENY ec2:DeleteTags / ec2:CreateTags on all
+```
 
 ## Services Used
 
 | Service | Purpose |
 |---------|---------|
-| AWS IAM | Users, groups, roles, policies |
-| AWS CloudTrail | API activity logging |
-| AWS Config | Compliance monitoring |
+| AWS IAM | Users, groups, policies |
+| Amazon EC2 | Production and development instances |
+| IAM Policy Simulator | Testing permissions safely |
 
 ## Steps
 ```bash
-# Create IAM groups
-aws iam create-group --group-name Admins
-aws iam create-group --group-name Developers
-aws iam create-group --group-name ReadOnly
+# Create IAM group
+aws iam create-group --group-name nextwork-dev-group
 
-# Attach policies to groups
-aws iam attach-group-policy --group-name Admins \
-  --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
+# Create IAM user
+aws iam create-user --user-name nextwork-dev-yeshi
 
-aws iam attach-group-policy --group-name Developers \
-  --policy-arn arn:aws:iam::aws:policy/PowerUserAccess
+# Add user to group
+aws iam add-user-to-group \
+    --user-name nextwork-dev-yeshi \
+    --group-name nextwork-dev-group
 
-aws iam attach-group-policy --group-name ReadOnly \
-  --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess
+# Create and attach policy
+aws iam create-policy \
+    --policy-name nextwork-dev-policy \
+    --policy-document file://iam-policy.json
 
-# Enable CloudTrail
-aws cloudtrail create-trail --name my-audit-trail \
-  --s3-bucket-name my-cloudtrail-logs
-
-aws cloudtrail start-logging --name my-audit-trail
+aws iam attach-group-policy \
+    --group-name nextwork-dev-group \
+    --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/nextwork-dev-policy
 ```
+
+## Test Results
+
+| Action | Instance | Result |
+|--------|---------|--------|
+| Stop instance | Production | Denied |
+| Stop instance | Development | Allowed |
+| Delete tags | Any | Denied |
+| Describe instances | Any | Allowed |
 
 ## What I Learned
 
-*Fill this in after completing the project*
-
-## Challenges & Fixes
-
-*Document any errors you hit and how you solved them*
+- IAM policies use Effect, Action, and Resource to control permissions
+- Tags are a powerful way to apply policies to specific resources
+- The IAM Policy Simulator lets you test permissions without disrupting live resources
+- Least privilege means giving users only exactly what they need — nothing more
+- The most challenging part was understanding how JSON policy statements work together
 
 ## Cleanup
 ```bash
-aws iam delete-group --group-name Admins
-aws iam delete-group --group-name Developers
-aws iam delete-group --group-name ReadOnly
-aws cloudtrail delete-trail --name my-audit-trail
+aws iam detach-group-policy \
+    --group-name nextwork-dev-group \
+    --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/nextwork-dev-policy
+aws iam remove-user-from-group \
+    --user-name nextwork-dev-yeshi \
+    --group-name nextwork-dev-group
+aws iam delete-user --user-name nextwork-dev-yeshi
+aws iam delete-group --group-name nextwork-dev-group
+aws iam delete-policy \
+    --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/nextwork-dev-policy
 ```
 
-## Learn More
+## License
 
-| Module | Topic |
-|--------|-------|
-| [AWS IAM Docs](https://docs.aws.amazon.com/iam) | Official IAM documentation |
-| [CloudTrail Docs](https://docs.aws.amazon.com/cloudtrail) | Official CloudTrail documentation |
-| [mzazon iam-access-control](https://github.com/mzazon/cloud-projects/tree/main/aws/iam-access-control) | Reference project |
+MIT
